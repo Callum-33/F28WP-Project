@@ -93,5 +93,62 @@ router.delete('/listings/:id', (req, res) => {
     res.status(200).json({ message: 'Listing deleted successfully.' });
 });
 
+// Lister Routes
+router.get('/listings/:id/bookings', (req, res) => {
+    const listingId = parseInt(req.params.id);
+
+    // load bookings
+    const bookings = readData('bookings.json');
+
+    if (bookings.length === 0) {
+        return res.status(200).json([]);
+    }
+    res.status(200).json(listingBookings);
+});
+
+router.put('/listings/:id/status', (req, res) => {
+    const bookingId = parseInt(req.params.id);
+    const newStatus = req.body.status;
+
+    if (!['approved', 'denied'].includes(newStatus)) {
+        return res.status(400).json({message: 'Invalid status value. Must be "approved" or "denied".' });
+    }
+
+    const bookings = readData('bookings.json');
+    const bookingIndex = bookings.findIndex(b => b.id === bookingId);
+    
+    if (bookingIndex === -1) {
+        return res.status(404).json({ message: 'Booking not found.' });
+    }
+
+    const bookingToUpdate = bookings[bookingIndex];
+
+    if (bookingToUpdate.status === 'pending') {
+        bookingToUpdate.status = newStatus;
+
+        bookings[bookingIndex] = bookingToUpdate;
+        writeData('bookings.json', bookings);
+
+        res.status(200).json({
+            message: 'Booking ${bookingId} ${newStatus}.',
+            booking: bookingToUpdate
+        });
+    } else {
+        return res.status(400).json({
+            message: `Cannot change status. Booking is already ${bookingToUpdate.status}.`
+        });
+    }
+});
+
+router.get('/users/:listerId/listings', (req, res) => {
+    const listerId = parseInt(req.params.listerId);
+
+    const listings = readData('listings.json');
+
+    const listersListing = listings.filter(l => l.listerId === listerId);
+
+    res.status(200).json(listersListing);
+});
+
 
 module.exports = router;
