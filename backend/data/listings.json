@@ -1,1 +1,90 @@
-[]
+[
+  {
+    "id": 1,
+    "title": "Modern Downtown Apartment",
+    "address": "123 Main St, New York, NY",
+    "price": 150,
+    "rating": 4.8,
+    "image": "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Stunning modern apartment in the heart of downtown with amazing city views.",
+    "location": "New York, NY"
+  },
+  {
+    "id": 2,
+    "title": "Cozy Beach House",
+    "address": "456 Ocean Ave, Miami, FL",
+    "price": 220,
+    "rating": 4.9,
+    "image": "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Beautiful beach house with direct ocean access and stunning sunset views.",
+    "location": "Miami, FL"
+  },
+  {
+    "id": 3,
+    "title": "Mountain Cabin Retreat",
+    "address": "789 Pine Rd, Aspen, CO",
+    "price": 180,
+    "rating": 4.7,
+    "image": "https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Rustic cabin nestled in the mountains, perfect for a peaceful getaway.",
+    "location": "Aspen, CO"
+  },
+  {
+    "id": 4,
+    "title": "Urban Loft Studio",
+    "address": "321 Art District, Los Angeles, CA",
+    "price": 135,
+    "rating": 4.6,
+    "image": "https://images.unsplash.com/photo-1502672260066-6bc35f0a8746?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Stylish loft in the arts district with exposed brick and high ceilings.",
+    "location": "Los Angeles, CA"
+  },
+  {
+    "id": 5,
+    "title": "Lakeside Villa",
+    "address": "555 Lake View Dr, Austin, TX",
+    "price": 195,
+    "rating": 4.9,
+    "image": "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Luxurious villa with private dock and panoramic lake views.",
+    "location": "Austin, TX"
+  },
+  {
+    "id": 6,
+    "title": "Historic Brownstone",
+    "address": "777 Heritage St, Boston, MA",
+    "price": 165,
+    "rating": 4.5,
+    "image": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Charming brownstone in historic neighborhood with original details.",
+    "location": "Boston, MA"
+  },
+  {
+    "id": 7,
+    "title": "Desert Oasis",
+    "address": "999 Canyon Blvd, Phoenix, AZ",
+    "price": 140,
+    "rating": 4.7,
+    "image": "https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Modern desert home with infinity pool and mountain backdrop.",
+    "location": "Phoenix, AZ"
+  },
+  {
+    "id": 8,
+    "title": "Waterfront Condo",
+    "address": "888 Harbor Way, Seattle, WA",
+    "price": 210,
+    "rating": 4.8,
+    "image": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&h=400&fit=crop",
+    "type": "rent",
+    "description": "Sleek waterfront condo with floor-to-ceiling windows and marina views.",
+    "location": "Seattle, WA"
+  }
+]

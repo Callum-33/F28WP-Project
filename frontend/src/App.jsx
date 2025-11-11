@@ -1,32 +1,28 @@
-import { useState, useEffect } from 'react'
-import { api } from './utils/api'
+import { BrowserRouter as Router, Routes, Route, Navigate as RouterNavigate } from 'react-router-dom'
+import Navigate from './components/Navigate'
+import RentPage from './routes/RentPage'
+import SellPage from './routes/SellPage'
+import FavouritesPage from './routes/FavouritesPage'
+import PropertyDetailPage from './routes/PropertyDetailPage'
 import './App.css'
 
 function App() {
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    // Test backend connection
-    const fetchData = async () => {
-      try {
-        const response = await api.get('/')
-        setMessage(response.data.message || 'Connected to backend!')
-        setLoading(false)
-      } catch (err) {
-        setError(err.message)
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [])
-
   return (
-    <div className="App">
-      
-    </div>
+    <Router>
+      <div className="App">
+        <Navigate />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<RouterNavigate to="/rent" replace />} />
+            <Route path="/rent" element={<RentPage />} />
+            <Route path="/sell" element={<SellPage />} />
+            <Route path="/favourites" element={<FavouritesPage />} />
+            <Route path="/property/:id" element={<PropertyDetailPage />} />
+            <Route path="*" element={<RouterNavigate to="/rent" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </Router>
   )
 }
 

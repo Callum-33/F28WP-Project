@@ -25,7 +25,7 @@ router.post('/listings', (req, res) => {
     listings.push(newListing);
     writeData('listings.json', listings);
 
-    resStatus(201).json({
+    res.status(201).json({
         message: 'Listing posted successfully.',
         listing: newListing
     });
@@ -33,14 +33,14 @@ router.post('/listings', (req, res) => {
 
 router.get('/listings', (req, res) => {
     const listings = readData('listings.json');
-    let fitleredListings = listings;
+    let filteredListings = listings;
     const { location, maxPrice } = req.query;
 
     if (location) {
         const searchLocation = location.toLowerCase();
         filteredListings = filteredListings.filter(listing =>
         (listing.location.city && listing.location.city.toLowerCase().includes(searchLocation)) ||
-        (listing.location.country && listing.location.country.toLowerCase().includes(searchLocation))
+        (listing.location.country && listing.location.country.toLowerCase().includes(searchLocation)) ||
         (listing.title && listing.title.toLowerCase().includes(searchLocation))
         );
     }
@@ -51,7 +51,7 @@ router.get('/listings', (req, res) => {
             filteredListings = filteredListings.filter(listing => listing.price <= priceLimit);
         }
     }
-    res.status(200).json({filteredListings });
+    res.status(200).json(filteredListings);
 });
 
 router.put('/listings/:id', (req, res) => {
