@@ -19,8 +19,8 @@ const ListingDetailPanel = ({ listing, onClose }) => {
 
   return (
     <div className="listing-detail-panel">
-      <button className="close-button" onClick={onClose}>×</button>
-      
+      <button className="close-button" onClick={onClose}>x</button>
+
       <div className="panel-images">
         <img src={image} alt={propertyName} className="main-image" />
         <div className="thumbnail-images">
@@ -41,19 +41,19 @@ const ListingDetailPanel = ({ listing, onClose }) => {
         </div>
 
         <div className="panel-tabs">
-          <button 
+          <button
             className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
             Overview
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'reviews' ? 'active' : ''}`}
             onClick={() => setActiveTab('reviews')}
           >
             Reviews
           </button>
-          <button 
+          <button
             className={`tab ${activeTab === 'about' ? 'active' : ''}`}
             onClick={() => setActiveTab('about')}
           >
@@ -89,7 +89,17 @@ const ListingDetailPanel = ({ listing, onClose }) => {
 
         <div className="panel-map">
           <div className="map-placeholder">
-            <p>Map placeholder - {pAddress}</p>
+            {/* <p>Map placeholder - {pAddress}</p> */}
+            <iframe
+              width="100%"
+              height="100%"
+              // style="border:0"
+              loading="lazy"
+              allowfullscreen
+              referrerpolicy="no-referrer-when-downgrade"
+              src={`https://www.google.com/maps/embed/v1/place?key=KEY_HERE
+    &q=${encodeURIComponent(pAddress)}`}>
+            </iframe>
           </div>
         </div>
       </div>
