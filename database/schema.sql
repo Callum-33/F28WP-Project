@@ -1,5 +1,8 @@
-CREATE DATABASE Rentals;
-USE Rentals;
+-- Drop existing tables if they exist
+DROP TABLE IF EXISTS Reviews;
+DROP TABLE IF EXISTS Bookings;
+DROP TABLE IF EXISTS Properties;
+DROP TABLE IF EXISTS Users;
 
 CREATE TABLE Users (
     userID INT AUTO_INCREMENT PRIMARY KEY,
@@ -19,8 +22,8 @@ CREATE TABLE Properties (
     pAddress VARCHAR(300),
     pricePerNight DECIMAL(6,2) NOT NULL,
     rooms INT NOT NULL,
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ownerID) REFERENCES Users(userID) ON DELETE CASCADE
+    imagePath VARCHAR(255),
+    FOREIGN KEY (ownerID) REFERENCES Users(userID) ON DELETE SET NULL
 );
 
 CREATE TABLE Bookings (
@@ -31,7 +34,6 @@ CREATE TABLE Bookings (
     endDate DATE NOT NULL,
     totalPrice DECIMAL(7,2) NOT NULL,
     bookingStatus ENUM('Pending', 'Approved', 'Denied') DEFAULT 'Pending',
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (propertyID) REFERENCES Properties(propertyID) ON DELETE CASCADE,
     FOREIGN KEY (renterID) REFERENCES Users(userID) ON DELETE CASCADE
 );
@@ -42,7 +44,7 @@ CREATE TABLE Reviews (
     renterID INT,
     rating TINYINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
     comment TEXT,
-    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    reviewDate TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (propertyID) REFERENCES Properties(propertyID) ON DELETE CASCADE,
     FOREIGN KEY (renterID) REFERENCES Users(userID) ON DELETE CASCADE
 );

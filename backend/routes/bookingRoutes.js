@@ -4,33 +4,33 @@ const db = require("../utils/dbConnection");
 
 
 // gets all of a users bookings
-router.get("/users/:userID", (req, res) => {
+router.get("/users/:userID", async (req, res) => {
   const userID = req.params.userID;
 
   try {
-    const result = db.query(
-      "SELECT * FROM Bookings WHERE renterID = $1", [userID]
+    const [result] = await db.query(
+      "SELECT * FROM Bookings WHERE renterID = ?", [userID]
     );
-    res.json(result.rows);
+    res.json(result);
   } catch (err) {
-    console.error("Error fetchign user bookings:", err);
+    console.error("Error fetching user bookings:", err);
     res.status(500).json({error: "Database error"});
   }
 });
 
 // create a new booking
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const {propertyID, renterID, startDate, endDate} = req.body;
 
   try {
     // get price per night
-    const priceResult = db.query(
-      `SELECT pricePerNight FROM Properties WHERE propertyID = $1`, [propertyID]
+    const [priceResult] = await db.query(
+      `SELECT pricePerNight FROM Properties WHERE propertyID = ?`, [propertyID]
     );
-    if (priceResult.rowCount === 0) {
+    if (priceResult.length === 0) {
       return res.status(404).json({error: "Property not found"});
     }
-    const pricePerNight = priceResult.rows[0].pricepernight;
+    const pricePerNight = priceResult[0].pricePerNight;
 
     // get number of nights
     const start = new Date(startDate);
@@ -45,15 +45,21 @@ router.post("/", (req, res) => {
     const totalPrice = pricePerNight * numberOfNights;
 
     // insert booking
-    const result = db.query(
+    const [result] = await db.query(
       `INSERT INTO Bookings (propertyID, renterID, startDate, endDate, totalPrice, bookingStatus)
-       VALUES ($1, $2, $3, $4, $5, 'Pending') RETURNING *`,
+       VALUES (?, ?, ?, ?, ?, 'Pending')`,
       [propertyID, renterID, startDate, endDate, totalPrice]
+    );
+
+    // Get the inserted booking
+    const [newBooking] = await db.query(
+      `SELECT * FROM Bookings WHERE bookingID = ?`,
+      [result.insertId]
     );
 
     res.json({
       message: "Booking created successfully",
-      booking: result.rows[0],
+      booking: newBooking[0],
     });
 
   } catch (err) {
@@ -63,21 +69,27 @@ router.post("/", (req, res) => {
 });
 
 // approve a booking
-router.put("/:bookingID/approve", (req, res) => {
+router.put("/:bookingID/approve", async (req, res) => {
   const bookingID = req.params.bookingID;
 
   try {
-    const result = db.query(
-      `UPDATE Bookings SET bookingStatus = 'Approved' WHERE bookingID = $1 RETURNING *`,
+    const [result] = await db.query(
+      `UPDATE Bookings SET bookingStatus = 'Approved' WHERE bookingID = ?`,
       [bookingID]
     );
-    if (result.rowCount === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({error: "Booking not found"});
     }
 
+    // Get the updated booking
+    const [updatedBooking] = await db.query(
+      `SELECT * FROM Bookings WHERE bookingID = ?`,
+      [bookingID]
+    );
+
     res.json({
       message: "Booking approved successfully",
-      booking: result.rows[0],
+      booking: updatedBooking[0],
     });
   } catch (err) {
     console.error("Error approving booking:", err);
@@ -86,21 +98,27 @@ router.put("/:bookingID/approve", (req, res) => {
 });
 
 // deny a booking
-router.put("/:bookingID/deny", (req, res) => {
+router.put("/:bookingID/deny", async (req, res) => {
   const bookingID = req.params.bookingID;
 
   try {
-    const result = db.query(
-      `UPDATE Bookings SET bookingStatus = 'Denied' WHERE bookingID = $1 RETURNING *`,
+    const [result] = await db.query(
+      `UPDATE Bookings SET bookingStatus = 'Denied' WHERE bookingID = ?`,
       [bookingID]
     );
-    if (result.rowCount === 0) {
+    if (result.affectedRows === 0) {
       return res.status(404).json({error: "Booking not found"});
     }
 
+    // Get the updated booking
+    const [updatedBooking] = await db.query(
+      `SELECT * FROM Bookings WHERE bookingID = ?`,
+      [bookingID]
+    );
+
     res.json({
       message: "Booking denied successfully",
-      booking: result.rows[0],
+      booking: updatedBooking[0],
     });
   } catch (err) {
     console.error("Error denying booking:", err);
