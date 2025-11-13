@@ -56,7 +56,7 @@ CREATE TABLE Sessions (
     FOREIGN KEY (userID) REFERENCES Users(userID) ON DELETE CASCADE
 );
 
-CREATE TABLE PropertyImages (
+CREATE TABLE PropertyImage (
     imageID INT AUTO_INCREMENT PRIMARY KEY,
     propertyID INT NOT NULL,
     imageURL VARCHAR(255) NOT NULL,
