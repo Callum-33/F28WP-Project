@@ -12,10 +12,10 @@ router.post('/users/register', async (req, res) => {
 
     try {
         // Check if username already exists
-        const existingUserQuery = 'SELECT userID FROM Users WHERE username = $1';
-        const existingUserResult = await pool.query(existingUserQuery, [username]);
+        const existingUserQuery = 'SELECT userID FROM Users WHERE username = ?';
+        const [existingUserResult] = await pool.query(existingUserQuery, [username]);
         
-        if (existingUserResult.rows.length > 0) {
+        if (existingUserResult.length > 0) {
             return res.status(409).json({ message: 'Username already exists' });
         }
 
@@ -23,8 +23,7 @@ router.post('/users/register', async (req, res) => {
 
         const insertQuery = `
             INSERT INTO Users (username, passwordHash, salt, role, email, fName, lName)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING userID, username, role, email, fName, lName
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
         
         const values = [
@@ -37,19 +36,25 @@ router.post('/users/register', async (req, res) => {
             lastName || ''
         ];
 
-        const result = await pool.query(insertQuery, values);
-        const newUser = result.rows[0];
+        const [result] = await pool.query(insertQuery, values);
+        
+        // Get the newly created user
+        const [newUserRows] = await pool.query(
+            'SELECT userID, username, role, email, fName, lName FROM Users WHERE userID = ?',
+            [result.insertId]
+        );
+        const newUser = newUserRows[0];
 
         res.status(201).json({ 
             message: 'User registered successfully', 
-            userId: newUser.userid,
+            userId: newUser.userID,
             user: {
-                id: newUser.userid,
+                id: newUser.userID,
                 username: newUser.username,
                 role: newUser.role,
                 email: newUser.email,
-                firstName: newUser.fname,
-                lastName: newUser.lname
+                firstName: newUser.fName,
+                lastName: newUser.lName
             }
         });
     } catch (error) {
@@ -64,57 +69,49 @@ router.put('/users/:id', async (req, res) => {
 
     try {
         // Check if user exists
-        const userExistsQuery = 'SELECT * FROM Users WHERE userID = $1';
-        const userResult = await pool.query(userExistsQuery, [userId]);
+        const userExistsQuery = 'SELECT * FROM Users WHERE userID = ?';
+        const [userResult] = await pool.query(userExistsQuery, [userId]);
         
-        if (userResult.rows.length === 0) {
+        if (userResult.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const currentUser = userResult.rows[0];
+        const currentUser = userResult[0];
         let updateFields = [];
         let values = [];
-        let paramCounter = 1;
 
         // Build dynamic update query
         if (username !== undefined) {
-            updateFields.push(`username = $${paramCounter}`);
+            updateFields.push('username = ?');
             values.push(username);
-            paramCounter++;
         }
         
         if (password !== undefined) {
             const { hash, salt } = hashPassword(password);
-            updateFields.push(`passwordHash = $${paramCounter}`);
+            updateFields.push('passwordHash = ?');
             values.push(hash);
-            paramCounter++;
-            updateFields.push(`salt = $${paramCounter}`);
+            updateFields.push('salt = ?');
             values.push(salt);
-            paramCounter++;
         }
         
         if (role !== undefined) {
-            updateFields.push(`role = $${paramCounter}`);
+            updateFields.push('role = ?');
             values.push(role);
-            paramCounter++;
         }
         
         if (email !== undefined) {
-            updateFields.push(`email = $${paramCounter}`);
+            updateFields.push('email = ?');
             values.push(email);
-            paramCounter++;
         }
         
         if (firstName !== undefined) {
-            updateFields.push(`fName = $${paramCounter}`);
+            updateFields.push('fName = ?');
             values.push(firstName);
-            paramCounter++;
         }
         
         if (lastName !== undefined) {
-            updateFields.push(`lName = $${paramCounter}`);
+            updateFields.push('lName = ?');
             values.push(lastName);
-            paramCounter++;
         }
 
         if (updateFields.length === 0) {
@@ -124,23 +121,28 @@ router.put('/users/:id', async (req, res) => {
         const updateQuery = `
             UPDATE Users 
             SET ${updateFields.join(', ')} 
-            WHERE userID = $${paramCounter}
-            RETURNING userID, username, role, email, fName, lName
+            WHERE userID = ?
         `;
         values.push(userId);
 
-        const result = await pool.query(updateQuery, values);
-        const updatedUser = result.rows[0];
+        await pool.query(updateQuery, values);
+        
+        // Get the updated user
+        const [updatedUserRows] = await pool.query(
+            'SELECT userID, username, role, email, fName, lName FROM Users WHERE userID = ?',
+            [userId]
+        );
+        const updatedUser = updatedUserRows[0];
 
         res.status(200).json({
             message: 'User updated successfully',
             user: {
-                id: updatedUser.userid,
+                id: updatedUser.userID,
                 username: updatedUser.username,
                 role: updatedUser.role,
                 email: updatedUser.email,
-                firstName: updatedUser.fname,
-                lastName: updatedUser.lname
+                firstName: updatedUser.fName,
+                lastName: updatedUser.lName
             }
         });
     } catch (error) {
@@ -153,48 +155,43 @@ router.delete('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
 
     try {
-        // Start a transaction to ensure data consistency
-        await pool.query('BEGIN');
-
         // Check if user exists
-        const userExistsQuery = 'SELECT userID FROM Users WHERE userID = $1';
-        const userResult = await pool.query(userExistsQuery, [userId]);
+        const userExistsQuery = 'SELECT userID FROM Users WHERE userID = ?';
+        const [userResult] = await pool.query(userExistsQuery, [userId]);
         
-        if (userResult.rows.length === 0) {
-            await pool.query('ROLLBACK');
+        if (userResult.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Delete related data first (to maintain referential integrity)
+        // MySQL with CASCADE on foreign keys will handle deletion of related records
+        // But if you want to be explicit or if CASCADE is not set, delete in order:
+        
         // Delete reviews by this user
-        await pool.query('DELETE FROM Reviews WHERE renterID = $1', [userId]);
+        await pool.query('DELETE FROM Reviews WHERE renterID = ?', [userId]);
         
         // Delete bookings by this user
-        await pool.query('DELETE FROM Bookings WHERE renterID = $1', [userId]);
+        await pool.query('DELETE FROM Bookings WHERE renterID = ?', [userId]);
         
-        // Delete properties owned by this user (and their associated bookings/reviews)
+        // Delete reviews for properties owned by this user
         await pool.query(`
             DELETE FROM Reviews WHERE propertyID IN 
-            (SELECT propertyID FROM Properties WHERE ownerID = $1)
+            (SELECT propertyID FROM Properties WHERE ownerID = ?)
         `, [userId]);
         
+        // Delete bookings for properties owned by this user
         await pool.query(`
             DELETE FROM Bookings WHERE propertyID IN 
-            (SELECT propertyID FROM Properties WHERE ownerID = $1)
+            (SELECT propertyID FROM Properties WHERE ownerID = ?)
         `, [userId]);
         
-        await pool.query('DELETE FROM Properties WHERE ownerID = $1', [userId]);
+        // Delete properties owned by this user
+        await pool.query('DELETE FROM Properties WHERE ownerID = ?', [userId]);
         
         // Finally, delete the user
-        await pool.query('DELETE FROM Users WHERE userID = $1', [userId]);
-
-        // Commit the transaction
-        await pool.query('COMMIT');
+        await pool.query('DELETE FROM Users WHERE userID = ?', [userId]);
 
         res.status(200).json({ message: 'User and associated data deleted successfully' });
     } catch (error) {
-        // Rollback the transaction on error
-        await pool.query('ROLLBACK');
         console.error('Error deleting user:', error);
         res.status(500).json({ message: 'Internal server error while deleting user' });
     }

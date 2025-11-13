@@ -23,8 +23,7 @@ router.post('/listings', async (req, res) => {
 
         const query = `
             INSERT INTO Properties (ownerID, propertyName, pDescription, pAddress, pricePerNight, rooms)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING propertyID, ownerID, propertyName, pDescription, pAddress, pricePerNight, rooms
+            VALUES (?, ?, ?, ?, ?, ?)
         `;
         
         const values = [
@@ -36,17 +35,23 @@ router.post('/listings', async (req, res) => {
             1 // Default to 1 room, you may want to make this a required field
         ];
 
-        const result = await pool.query(query, values);
-        const newListing = result.rows[0];
+        const [result] = await pool.query(query, values);
+        
+        // Get the newly created listing
+        const [newListingRows] = await pool.query(
+            'SELECT propertyID, ownerID, propertyName, pDescription, pAddress, pricePerNight, rooms FROM Properties WHERE propertyID = ?',
+            [result.insertId]
+        );
+        const newListing = newListingRows[0];
 
         // Transform the response to match the expected format
         const responseData = {
-            id: newListing.propertyid,
-            listerId: newListing.ownerid,
-            title: newListing.propertyname,
-            description: newListing.pdescription,
-            price: parseFloat(newListing.pricepernight),
-            location: { address: newListing.paddress },
+            id: newListing.propertyID,
+            listerId: newListing.ownerID,
+            title: newListing.propertyName,
+            description: newListing.pDescription,
+            price: parseFloat(newListing.pricePerNight),
+            location: { address: newListing.pAddress },
             rooms: newListing.rooms,
             dateListed: new Date().toISOString()
         };
@@ -65,12 +70,14 @@ router.post('/listings', async (req, res) => {
 router.get('/listings', async (req, res) => {
     try {
         let query = `
-            SELECT p.propertyID as id, p.ownerID as listerId, p.propertyName as title, 
-                   p.pDescription as description, p.pAddress as address, 
-                   p.pricePerNight as price, p.rooms,
-                   u.fName as ownerFirstName, u.lName as ownerLastName
+            SELECT p.propertyID, p.ownerID, p.propertyName, 
+                   p.pDescription, p.pAddress, 
+                   p.pricePerNight, p.rooms, p.imagePath,
+                   u.fName as ownerFirstName, u.lName as ownerLastName,
+                   COALESCE(AVG(r.rating), 0) as rating
             FROM Properties p
             LEFT JOIN Users u ON p.ownerID = u.userID
+            LEFT JOIN Reviews r ON p.propertyID = r.propertyID
         `;
         let values = [];
         let whereConditions = [];
@@ -78,14 +85,15 @@ router.get('/listings', async (req, res) => {
         const { location, maxPrice } = req.query;
 
         if (location) {
-            whereConditions.push(`(LOWER(p.pAddress) LIKE $${whereConditions.length + 1} OR LOWER(p.propertyName) LIKE $${whereConditions.length + 1})`);
-            values.push(`%${location.toLowerCase()}%`);
+            whereConditions.push('(LOWER(p.pAddress) LIKE ? OR LOWER(p.propertyName) LIKE ?)');
+            const searchTerm = `%${location.toLowerCase()}%`;
+            values.push(searchTerm, searchTerm);
         }
 
         if (maxPrice) {
             const priceLimit = parseFloat(maxPrice);
             if (!isNaN(priceLimit)) {
-                whereConditions.push(`p.pricePerNight <= $${whereConditions.length + 1}`);
+                whereConditions.push('p.pricePerNight <= ?');
                 values.push(priceLimit);
             }
         }
@@ -94,18 +102,23 @@ router.get('/listings', async (req, res) => {
             query += ` WHERE ${whereConditions.join(' AND ')}`;
         }
 
-        const result = await pool.query(query, values);
+        query += ' GROUP BY p.propertyID, p.ownerID, p.propertyName, p.pDescription, p.pAddress, p.pricePerNight, p.rooms, p.imagePath, u.fName, u.lName';
+
+        const [result] = await pool.query(query, values);
         
         // Transform the results to match the expected format
-        const listings = result.rows.map(row => ({
-            id: row.id,
-            listerId: row.listerid,
-            title: row.title,
-            description: row.description,
-            price: parseFloat(row.price),
-            location: { address: row.address },
+        const listings = result.map(row => ({
+            propertyID: row.propertyID,
+            ownerID: row.ownerID,
+            propertyName: row.propertyName,
+            pDescription: row.pDescription,
+            pAddress: row.pAddress,
+            pricePerNight: parseFloat(row.pricePerNight),
             rooms: row.rooms,
-            owner: row.ownerfirstname ? `${row.ownerfirstname} ${row.ownerlastname}` : null
+            imagePath: row.imagePath,
+            rating: parseFloat(row.rating) || 0,
+            image: row.imagePath || 'https://via.placeholder.com/400x400?text=No+Image',
+            owner: row.ownerFirstName ? `${row.ownerFirstName} ${row.ownerLastName}` : null
         }));
 
         res.status(200).json(listings);
@@ -116,61 +129,97 @@ router.get('/listings', async (req, res) => {
 });
 
 // Update listing
-router.put('/listings/:id', (req, res) => {
+router.put('/listings/:id', async (req, res) => {
     const listingId = parseInt(req.params.id);
     const updateData = req.body;
-    const listings = readData('listings.json');
 
-    const listingIndex = listings.findIndex(l => l.id === listingId);
+    try {
+        // Check if listing exists
+        const [existing] = await pool.query('SELECT propertyID FROM Properties WHERE propertyID = ?', [listingId]);
+        
+        if (existing.length === 0) {
+            return res.status(404).json({ error: 'Listing not found' });
+        }
 
-    if (listingIndex === -1) {
-        return res.status(404).json({ error: 'Listing not found' });
+        let updateFields = [];
+        let values = [];
+
+        if (updateData.title !== undefined) {
+            updateFields.push('propertyName = ?');
+            values.push(updateData.title);
+        }
+        if (updateData.description !== undefined) {
+            updateFields.push('pDescription = ?');
+            values.push(updateData.description);
+        }
+        if (updateData.price !== undefined) {
+            updateFields.push('pricePerNight = ?');
+            values.push(parseFloat(updateData.price));
+        }
+        if (updateData.rooms !== undefined) {
+            updateFields.push('rooms = ?');
+            values.push(updateData.rooms);
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        values.push(listingId);
+        const updateQuery = `UPDATE Properties SET ${updateFields.join(', ')} WHERE propertyID = ?`;
+        
+        await pool.query(updateQuery, values);
+
+        // Get the updated listing
+        const [updatedRows] = await pool.query('SELECT * FROM Properties WHERE propertyID = ?', [listingId]);
+        
+        res.status(200).json({
+            message: 'Listing updated successfully.',
+            listing: updatedRows[0]
+        });
+    } catch (error) {
+        console.error('Error updating listing:', error);
+        res.status(500).json({ error: 'Internal server error while updating listing' });
     }
-
-    const currentListing = listings[listingIndex];
-    listings[listingIndex] = {
-        ...currentListing,
-        ...updateData,
-        id: listingId,
-    };
-
-    writeData('listings.json', listings);
-    res.status(200).json({
-        message: 'Listing updated successfully.',
-        listing: listings[listingIndex]
-    });
 });
 
 // Delete listing
-router.delete('/listings/:id', (req, res) => {
+router.delete('/listings/:id', async (req, res) => {
     const listingId = parseInt(req.params.id);
-    const listings = readData('listings.json');
 
-    const updatedListings = listings.filter(l => l.id !== listingId);
+    try {
+        const [result] = await pool.query('DELETE FROM Properties WHERE propertyID = ?', [listingId]);
 
-    if (updatedListings.length === listings.length) {
-        return res.status(404).json({ error: 'Listing not found' });
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ error: 'Listing not found' });
+        }
+
+        res.status(200).json({ message: 'Listing deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting listing:', error);
+        res.status(500).json({ error: 'Internal server error while deleting listing' });
     }
-
-    writeData('listings.json', updatedListings);
-    res.status(200).json({ message: 'Listing deleted successfully.' });
 });
 
-// Lister Routes
-router.get('/listings/:id/bookings', (req, res) => {
+// Lister Routes - Get bookings for a property
+router.get('/listings/:id/bookings', async (req, res) => {
     const listingId = parseInt(req.params.id);
 
-    // load bookings
-    const bookings = readData('bookings.json');
+    try {
+        const [bookings] = await pool.query(
+            'SELECT * FROM Bookings WHERE propertyID = ?',
+            [listingId]
+        );
 
-    if (bookings.length === 0) {
-        return res.status(200).json([]);
+        res.status(200).json(bookings);
+    } catch (error) {
+        console.error('Error fetching bookings:', error);
+        res.status(500).json({ error: 'Internal server error while fetching bookings' });
     }
-    res.status(200).json(listingBookings);
 });
 
 // Approve / deny booking
-router.put('/listings/:id/status', (req, res) => {
+router.put('/listings/:id/status', async (req, res) => {
     const bookingId = parseInt(req.params.id);
     const newStatus = req.body.status;
 
@@ -178,41 +227,54 @@ router.put('/listings/:id/status', (req, res) => {
         return res.status(400).json({message: 'Invalid status value. Must be "approved" or "denied".' });
     }
 
-    const bookings = readData('bookings.json');
-    const bookingIndex = bookings.findIndex(b => b.id === bookingId);
-    
-    if (bookingIndex === -1) {
-        return res.status(404).json({ message: 'Booking not found.' });
-    }
+    try {
+        const [bookings] = await pool.query('SELECT * FROM Bookings WHERE bookingID = ?', [bookingId]);
+        
+        if (bookings.length === 0) {
+            return res.status(404).json({ message: 'Booking not found.' });
+        }
 
-    const bookingToUpdate = bookings[bookingIndex];
+        const bookingToUpdate = bookings[0];
 
-    if (bookingToUpdate.status === 'pending') {
-        bookingToUpdate.status = newStatus;
+        if (bookingToUpdate.bookingStatus === 'Pending') {
+            const capitalizedStatus = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+            await pool.query(
+                'UPDATE Bookings SET bookingStatus = ? WHERE bookingID = ?',
+                [capitalizedStatus, bookingId]
+            );
 
-        bookings[bookingIndex] = bookingToUpdate;
-        writeData('bookings.json', bookings);
+            const [updated] = await pool.query('SELECT * FROM Bookings WHERE bookingID = ?', [bookingId]);
 
-        res.status(200).json({
-            message: 'Booking ${bookingId} ${newStatus}.',
-            booking: bookingToUpdate
-        });
-    } else {
-        return res.status(400).json({
-            message: `Cannot change status. Booking is already ${bookingToUpdate.status}.`
-        });
+            res.status(200).json({
+                message: `Booking ${bookingId} ${newStatus}.`,
+                booking: updated[0]
+            });
+        } else {
+            return res.status(400).json({
+                message: `Cannot change status. Booking is already ${bookingToUpdate.bookingStatus}.`
+            });
+        }
+    } catch (error) {
+        console.error('Error updating booking status:', error);
+        res.status(500).json({ error: 'Internal server error while updating booking status' });
     }
 });
 
 // View lister's listings
-router.get('/users/:listerId/listings', (req, res) => {
+router.get('/users/:listerId/listings', async (req, res) => {
     const listerId = parseInt(req.params.listerId);
 
-    const listings = readData('listings.json');
+    try {
+        const [listings] = await pool.query(
+            'SELECT * FROM Properties WHERE ownerID = ?',
+            [listerId]
+        );
 
-    const listersListing = listings.filter(l => l.listerId === listerId);
-
-    res.status(200).json(listersListing);
+        res.status(200).json(listings);
+    } catch (error) {
+        console.error('Error fetching user listings:', error);
+        res.status(500).json({ error: 'Internal server error while fetching user listings' });
+    }
 });
 
 
