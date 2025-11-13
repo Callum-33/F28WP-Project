@@ -13,6 +13,7 @@ CREATE TABLE Properties (
     ownerID INT,
     propertyName VARCHAR(50) NOT NULL,
     pDescription TEXT NOT NULL,
+    pType VARCHAR(50) NOT NULL,
     pAddress VARCHAR(300),
     pricePerNight DECIMAL(6,2) NOT NULL,
     rooms INT NOT NULL,
