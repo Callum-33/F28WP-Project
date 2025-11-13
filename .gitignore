@@ -33,3 +33,6 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Ignore all package lock files in all subdirectories
+**/package-lock.json

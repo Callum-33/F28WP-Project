@@ -1,6 +1,19 @@
 # F28WP Project - PERN Stack
 
-A full-stack web application using the PERN stack (PostgreSQL, Express, React, Node.js) with Docker.
+A full-stack web project using the PERN stack (PostgreSQL, Express, React, Node.js) with Docker.
+
+The aim of this project is to build a full stack "clone" of airbnb.
+
+## Features
+
+- Log in/Sign up (User accounts)
+- View and Post rental listings
+- Filter and sort listings by location, price, bedrooms, etc
+- ...
+
+## Design choices
+
+Here we should discuss why we went with different programming choices to help us plan, develop, and present our project.
 
 ## Prerequisites
 
@@ -106,6 +119,7 @@ F28WP-Project/
 ## Environment Variables
 
 ### Backend (.env or docker-compose.yml)
+
 - `NODE_ENV` - Environment (development/production)
 - `PORT` - Backend server port
 - `DB_HOST` - PostgreSQL host
@@ -115,6 +129,7 @@ F28WP-Project/
 - `DB_NAME` - Database name
 
 ### Frontend
+
 - `VITE_API_URL` - Backend API URL
 
 ## Database
@@ -130,18 +145,17 @@ docker-compose exec postgres psql -U postgres -d rentals
 ## Troubleshooting
 
 ### Port already in use
+
 If you get port conflicts, stop the conflicting service or change the port mappings in `docker-compose.yml`.
 
 ### Database connection issues
+
 Make sure the PostgreSQL container is healthy before the backend starts:
+
 ```bash
 docker-compose ps
 ```
 
 ### Frontend can't connect to backend
+
 Check that the `VITE_API_URL` in the frontend `.env` file matches your backend URL.
-
-## License
-
-ISC
-

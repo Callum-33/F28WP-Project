@@ -1,104 +1,203 @@
 const router = require('express').Router();
-const { readData, writeData } = require('../utils/dataHandler');
+const pool = require('../utils/dbConnection');
 const { hashPassword } = require('../utils/cryptoUtils');
 
-const generateId = (arr) => arr.length ? Math.max(...arr.map(item => item.id)) + 1 : 101;
 
+router.post('/users/register', async (req, res) => {
+    const { username, password, role, email, firstName, lastName } = req.body;
 
-router.post('/users/register', (req, res) => {
-    const { username, password, role, email } = req.body;
-
-    if (!username || !password || !role) {
-        return res.status(400).json({ message: 'Missing required fields: username, password, role' });
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Missing required fields: username, password' });
     }
 
-    const { hash, salt } = hashPassword(password);
+    try {
+        // Check if username already exists
+        const existingUserQuery = 'SELECT userID FROM Users WHERE username = $1';
+        const existingUserResult = await pool.query(existingUserQuery, [username]);
+        
+        if (existingUserResult.rows.length > 0) {
+            return res.status(409).json({ message: 'Username already exists' });
+        }
 
-    const users = readData('users.json');
-    if (users.some(u => u.username === username)) {
-        return res.status(409).json({ message: 'Username already exists' });
+        const { hash, salt } = hashPassword(password);
+
+        const insertQuery = `
+            INSERT INTO Users (username, passwordHash, salt, role, email, fName, lName)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING userID, username, role, email, fName, lName
+        `;
+        
+        const values = [
+            username,
+            hash,
+            salt,
+            role || 'user',
+            email || null,
+            firstName || '',
+            lastName || ''
+        ];
+
+        const result = await pool.query(insertQuery, values);
+        const newUser = result.rows[0];
+
+        res.status(201).json({ 
+            message: 'User registered successfully', 
+            userId: newUser.userid,
+            user: {
+                id: newUser.userid,
+                username: newUser.username,
+                role: newUser.role,
+                email: newUser.email,
+                firstName: newUser.fname,
+                lastName: newUser.lname
+            }
+        });
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).json({ message: 'Internal server error while registering user' });
     }
-
-    const newUser = {
-        id: generateId(users),
-        username,
-        passwordHash: hash,
-        salt,
-        role,
-        email: email
-    };
-
-    users.push(newUser);
-    writeData('users.json', users);
-
-    res.status(201).json({ message: 'User registered successfully', userId: newUser.id });
 });
 
-router.put('/users/:id', (req, res) => {
+router.put('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
-    const updatedData = req.body;
-    const users = readData('users.json');
-    const userIndex = users.findIndex(u => u.id === userId);
+    const { username, password, role, email, firstName, lastName } = req.body;
 
-    if (userIddex === -1) {
-        return res.status(404).json({ message: 'User not found' });
+    try {
+        // Check if user exists
+        const userExistsQuery = 'SELECT * FROM Users WHERE userID = $1';
+        const userResult = await pool.query(userExistsQuery, [userId]);
+        
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const currentUser = userResult.rows[0];
+        let updateFields = [];
+        let values = [];
+        let paramCounter = 1;
+
+        // Build dynamic update query
+        if (username !== undefined) {
+            updateFields.push(`username = $${paramCounter}`);
+            values.push(username);
+            paramCounter++;
+        }
+        
+        if (password !== undefined) {
+            const { hash, salt } = hashPassword(password);
+            updateFields.push(`passwordHash = $${paramCounter}`);
+            values.push(hash);
+            paramCounter++;
+            updateFields.push(`salt = $${paramCounter}`);
+            values.push(salt);
+            paramCounter++;
+        }
+        
+        if (role !== undefined) {
+            updateFields.push(`role = $${paramCounter}`);
+            values.push(role);
+            paramCounter++;
+        }
+        
+        if (email !== undefined) {
+            updateFields.push(`email = $${paramCounter}`);
+            values.push(email);
+            paramCounter++;
+        }
+        
+        if (firstName !== undefined) {
+            updateFields.push(`fName = $${paramCounter}`);
+            values.push(firstName);
+            paramCounter++;
+        }
+        
+        if (lastName !== undefined) {
+            updateFields.push(`lName = $${paramCounter}`);
+            values.push(lastName);
+            paramCounter++;
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ message: 'No fields to update' });
+        }
+
+        const updateQuery = `
+            UPDATE Users 
+            SET ${updateFields.join(', ')} 
+            WHERE userID = $${paramCounter}
+            RETURNING userID, username, role, email, fName, lName
+        `;
+        values.push(userId);
+
+        const result = await pool.query(updateQuery, values);
+        const updatedUser = result.rows[0];
+
+        res.status(200).json({
+            message: 'User updated successfully',
+            user: {
+                id: updatedUser.userid,
+                username: updatedUser.username,
+                role: updatedUser.role,
+                email: updatedUser.email,
+                firstName: updatedUser.fname,
+                lastName: updatedUser.lname
+            }
+        });
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ message: 'Internal server error while updating user' });
     }
-
-    const currentUser = users[userIndex];
-    let newHash = currentUser.passwordHash;
-    let newSalt = currentUser.salt;
-
-    if (updatedData.password) {
-        const { hash, salt } = hashPassword(updatedData.password);
-        newHash = hash;
-        newSalt = salt;
-    }
-
-    users[userIndex] = {
-        ...currentUser,
-        ...updatedData,
-        passwordHash: newHash,
-        salt: newSalt,
-        id: userId
-    };
-
-    writeData('users.json', users);
-
-    const { passwordHash, salt, ...safeUser } = users[userIndex];
-    res.status(200).json({
-        message: 'User updated successfully',
-        user: safeUser
-    });
 });
 
-router.delete('/users/:id', (req, res) => {
+router.delete('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
 
-    let isers = readData('users.json');
-    const initialUserCount = users.length;
-    users = users.filter(u => u.id !== userId);
+    try {
+        // Start a transaction to ensure data consistency
+        await pool.query('BEGIN');
 
-    if (users.length === initialUserCount) {
-        return res.status(404).json({ message: 'User not found' });
+        // Check if user exists
+        const userExistsQuery = 'SELECT userID FROM Users WHERE userID = $1';
+        const userResult = await pool.query(userExistsQuery, [userId]);
+        
+        if (userResult.rows.length === 0) {
+            await pool.query('ROLLBACK');
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Delete related data first (to maintain referential integrity)
+        // Delete reviews by this user
+        await pool.query('DELETE FROM Reviews WHERE renterID = $1', [userId]);
+        
+        // Delete bookings by this user
+        await pool.query('DELETE FROM Bookings WHERE renterID = $1', [userId]);
+        
+        // Delete properties owned by this user (and their associated bookings/reviews)
+        await pool.query(`
+            DELETE FROM Reviews WHERE propertyID IN 
+            (SELECT propertyID FROM Properties WHERE ownerID = $1)
+        `, [userId]);
+        
+        await pool.query(`
+            DELETE FROM Bookings WHERE propertyID IN 
+            (SELECT propertyID FROM Properties WHERE ownerID = $1)
+        `, [userId]);
+        
+        await pool.query('DELETE FROM Properties WHERE ownerID = $1', [userId]);
+        
+        // Finally, delete the user
+        await pool.query('DELETE FROM Users WHERE userID = $1', [userId]);
+
+        // Commit the transaction
+        await pool.query('COMMIT');
+
+        res.status(200).json({ message: 'User and associated data deleted successfully' });
+    } catch (error) {
+        // Rollback the transaction on error
+        await pool.query('ROLLBACK');
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: 'Internal server error while deleting user' });
     }
-
-    writeData('users.json', users);
-    res.status(200).json({ message: 'User deleted successfully' });
-
-    let listings = readData('listings.json');
-    listings = listings.filter(l => l.listerId !== userId);
-    writeData('listings.json', listings);
-
-    let bookings = readData('bookings.json');
-    bookings = bookings.filter(b => b.userId !== userId);
-    writeData('bookings.json', bookings);
-
-    let reviews = readData('reviews.json');
-    reviews = reviews.filter(r => r.userId !== userId);
-    writeData('reviews.json', reviews);
-
-    res.status(200).json({ message: 'User and associated data deleted successfully' });
-
 });
 
 module.exports = router;
