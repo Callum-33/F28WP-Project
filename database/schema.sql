@@ -62,3 +62,4 @@ CREATE TABLE PropertyImages (
     imageURL VARCHAR(255) NOT NULL,
     FOREIGN KEY (propertyID) REFERENCES Properties(propertyID) ON DELETE CASCADE
 );
+
