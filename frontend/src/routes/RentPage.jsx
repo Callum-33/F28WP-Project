@@ -10,6 +10,8 @@ const RentPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
+  const [maxPrice, setMaxPrice] = useState(Infinity);
+  const [minPrice, setMinPrice] = useState(0);
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -45,6 +47,7 @@ const RentPage = () => {
         <ListingGrid>
           {listings.map((listing, index) => {
             const isActive = selectedListing && listing.propertyID === selectedListing.propertyID;
+            if (listing.pricePerNight <= maxPrice && listing.pricePerNight >= minPrice)
             return (
               <Card 
                 key={listing.propertyID || index} 
