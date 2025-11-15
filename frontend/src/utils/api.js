@@ -13,11 +13,11 @@ export const api = axios.create({
 // Request interceptor for API calls
 api.interceptors.request.use(
   (config) => {
-    // You can add auth tokens here if needed
-    // const token = localStorage.getItem('token')
-    // if (token) {
-    //   config.headers.Authorization = `Bearer ${token}`
-    // }
+    // Add auth token from localStorage if available
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
   (error) => {
@@ -32,6 +32,14 @@ api.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       console.error('API Error:', error.response.data)
+      
+      // If unauthorized, clear token and redirect to login
+      if (error.response.status === 401) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        // Optionally redirect to login page
+        // window.location.href = '/login'
+      }
     } else if (error.request) {
       // Request made but no response
       console.error('Network Error:', error.request)
@@ -42,5 +50,12 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+// Auth API functions
+export const authAPI = {
+  register: (userData) => api.post('/api/users/register', userData),
+  login: (credentials) => api.post('/api/login', credentials),
+  logout: () => api.post('/api/logout'),
+}
 
 export default api

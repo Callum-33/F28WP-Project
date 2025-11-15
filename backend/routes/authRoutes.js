@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../utils/dbConnection');
-const { hashPassword } = require('../utils/cryptoUtils');
+const { hashPassword, verifyPassword, generateSessionToken } = require('../utils/cryptoUtils');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
 
 router.post('/users/register', async (req, res) => {
@@ -63,7 +64,7 @@ router.post('/users/register', async (req, res) => {
     }
 });
 
-router.put('/users/:id', async (req, res) => {
+router.put('/users/:id', authenticateToken, async (req, res) => {
     const userId = parseInt(req.params.id);
     const { username, password, role, email, firstName, lastName } = req.body;
 
@@ -151,7 +152,7 @@ router.put('/users/:id', async (req, res) => {
     }
 });
 
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', authenticateToken, async (req, res) => {
     const userId = parseInt(req.params.id);
 
     try {
@@ -194,6 +195,78 @@ router.delete('/users/:id', async (req, res) => {
     } catch (error) {
         console.error('Error deleting user:', error);
         res.status(500).json({ message: 'Internal server error while deleting user' });
+    }
+});
+
+router.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password required' });
+    }
+
+    try {
+        // Get user from database
+        const [userRows] = await pool.query(
+            'SELECT userID, username, passwordHash, salt, role, email, fName, lName FROM Users WHERE username = ?',
+            [username]
+        );
+
+        if (userRows.length === 0) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const user = userRows[0];
+
+        // Verify password
+        if (!verifyPassword(password, user.passwordHash, user.salt)) {
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        // Generate session token
+        const sessionToken = generateSessionToken();
+        const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+
+        // Store session in database
+        await pool.query(
+            'INSERT INTO Sessions (userID, sessionToken, expiry) VALUES (?, ?, ?)',
+            [user.userID, sessionToken, expiry]
+        );
+
+        res.status(200).json({
+            message: 'Login successful',
+            token: sessionToken,
+            user: {
+                id: user.userID,
+                username: user.username,
+                role: user.role,
+                email: user.email,
+                firstName: user.fName,
+                lastName: user.lName
+            }
+        });
+    } catch (error) {
+        console.error('Error logging in:', error);
+        res.status(500).json({ message: 'Internal server error while logging in' });
+    }
+});
+
+router.post('/logout', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const token = authHeader.substring(7);
+
+    try {
+        // Delete session from database
+        await pool.query('DELETE FROM Sessions WHERE sessionToken = ?', [token]);
+        res.status(200).json({ message: 'Logout successful' });
+    } catch (error) {
+        console.error('Error logging out:', error);
+        res.status(500).json({ message: 'Internal server error while logging out' });
     }
 });
 

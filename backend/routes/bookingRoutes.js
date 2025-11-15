@@ -1,10 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../utils/dbConnection");
+const { authenticateToken } = require('../middleware/authMiddleware');
 
 
-// gets all of a users bookings
-router.get("/users/:userID", async (req, res) => {
+// gets all of a users bookings (protected)
+router.get("/users/:userID", authenticateToken, async (req, res) => {
   const userID = req.params.userID;
 
   try {
@@ -18,8 +19,8 @@ router.get("/users/:userID", async (req, res) => {
   }
 });
 
-// create a new booking
-router.post("/", async (req, res) => {
+// create a new booking (protected)
+router.post("/", authenticateToken, async (req, res) => {
   const {propertyID, renterID, startDate, endDate} = req.body;
 
   try {
@@ -68,8 +69,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// approve a booking
-router.put("/:bookingID/approve", async (req, res) => {
+// approve a booking (protected)
+router.put("/:bookingID/approve", authenticateToken, async (req, res) => {
   const bookingID = req.params.bookingID;
 
   try {
@@ -97,8 +98,8 @@ router.put("/:bookingID/approve", async (req, res) => {
   }
 });
 
-// deny a booking
-router.put("/:bookingID/deny", async (req, res) => {
+// deny a booking (protected)
+router.put("/:bookingID/deny", authenticateToken, async (req, res) => {
   const bookingID = req.params.bookingID;
 
   try {

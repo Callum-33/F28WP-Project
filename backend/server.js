@@ -21,6 +21,7 @@ const authRoutes = require('./routes/authRoutes');
 const listingRoutes = require('./routes/listingRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 
+// Public routes (no authentication required)
 app.use('/api', authRoutes);
 app.use('/api', listingRoutes);
 app.use('/api/bookings', bookingRoutes);

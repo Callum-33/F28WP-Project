@@ -1,9 +1,10 @@
 
 const router = require('express').Router();
 const pool = require('../utils/dbConnection');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
-// Create listing
-router.post('/listings', async (req, res) => {
+// Create listing (protected)
+router.post('/listings', authenticateToken, async (req, res) => {
     const { listerId, title, description, price, location } = req.body;
 
     if (!title || !price || !listerId) {
@@ -72,9 +73,13 @@ router.get('/listings', async (req, res) => {
         let query = `
             SELECT p.propertyID, p.ownerID, p.propertyName, 
                    p.pDescription, p.pAddress, 
-                   p.pricePerNight, p.rooms, p.imagePath,
+                   p.pricePerNight, p.rooms,
                    u.fName as ownerFirstName, u.lName as ownerLastName,
-                   COALESCE(AVG(r.rating), 0) as rating
+                   COALESCE(AVG(r.rating), 0) as rating,
+                   (SELECT imagePath FROM PropertyImages 
+                    WHERE propertyID = p.propertyID 
+                    AND isPrimary = TRUE 
+                    LIMIT 1) as primaryImage
             FROM Properties p
             LEFT JOIN Users u ON p.ownerID = u.userID
             LEFT JOIN Reviews r ON p.propertyID = r.propertyID
@@ -102,7 +107,7 @@ router.get('/listings', async (req, res) => {
             query += ` WHERE ${whereConditions.join(' AND ')}`;
         }
 
-        query += ' GROUP BY p.propertyID, p.ownerID, p.propertyName, p.pDescription, p.pAddress, p.pricePerNight, p.rooms, p.imagePath, u.fName, u.lName';
+        query += ' GROUP BY p.propertyID, p.ownerID, p.propertyName, p.pDescription, p.pAddress, p.pricePerNight, p.rooms, u.fName, u.lName';
 
         const [result] = await pool.query(query, values);
         
@@ -115,9 +120,9 @@ router.get('/listings', async (req, res) => {
             pAddress: row.pAddress,
             pricePerNight: parseFloat(row.pricePerNight),
             rooms: row.rooms,
-            imagePath: row.imagePath,
+            imagePath: row.primaryImage,
             rating: parseFloat(row.rating) || 0,
-            image: row.imagePath || 'https://via.placeholder.com/400x400?text=No+Image',
+            image: row.primaryImage || 'https://via.placeholder.com/400x400?text=No+Image',
             owner: row.ownerFirstName ? `${row.ownerFirstName} ${row.ownerLastName}` : null
         }));
 
@@ -128,8 +133,8 @@ router.get('/listings', async (req, res) => {
     }
 });
 
-// Update listing
-router.put('/listings/:id', async (req, res) => {
+// Update listing (protected)
+router.put('/listings/:id', authenticateToken, async (req, res) => {
     const listingId = parseInt(req.params.id);
     const updateData = req.body;
 
@@ -183,8 +188,8 @@ router.put('/listings/:id', async (req, res) => {
     }
 });
 
-// Delete listing
-router.delete('/listings/:id', async (req, res) => {
+// Delete listing (protected)
+router.delete('/listings/:id', authenticateToken, async (req, res) => {
     const listingId = parseInt(req.params.id);
 
     try {
@@ -201,8 +206,8 @@ router.delete('/listings/:id', async (req, res) => {
     }
 });
 
-// Lister Routes - Get bookings for a property
-router.get('/listings/:id/bookings', async (req, res) => {
+// Lister Routes - Get bookings for a property (protected)
+router.get('/listings/:id/bookings', authenticateToken, async (req, res) => {
     const listingId = parseInt(req.params.id);
 
     try {
@@ -218,8 +223,8 @@ router.get('/listings/:id/bookings', async (req, res) => {
     }
 });
 
-// Approve / deny booking
-router.put('/listings/:id/status', async (req, res) => {
+// Approve / deny booking (protected)
+router.put('/listings/:id/status', authenticateToken, async (req, res) => {
     const bookingId = parseInt(req.params.id);
     const newStatus = req.body.status;
 
@@ -260,8 +265,8 @@ router.put('/listings/:id/status', async (req, res) => {
     }
 });
 
-// View lister's listings
-router.get('/users/:listerId/listings', async (req, res) => {
+// View lister's listings (protected)
+router.get('/users/:listerId/listings', authenticateToken, async (req, res) => {
     const listerId = parseInt(req.params.listerId);
 
     try {

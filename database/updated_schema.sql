@@ -1,5 +1,5 @@
-CREATE DATABASE Rentals;
-USE Rentals;
+CREATE DATABASE IF NOT EXISTS rentals;
+USE rentals;
 
 CREATE TABLE Users (
     userID INT AUTO_INCREMENT PRIMARY KEY,
@@ -50,6 +50,25 @@ CREATE TABLE Reviews (
     FOREIGN KEY (renterID) REFERENCES Users(userID) ON DELETE CASCADE
 );
 
+CREATE TABLE Sessions (
+    sessionID INT AUTO_INCREMENT PRIMARY KEY,
+    userID INT,
+    sessionToken VARCHAR(100) NOT NULL UNIQUE,
+    expiry DATETIME NOT NULL,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userID) REFERENCES Users(userID) ON DELETE CASCADE
+);
+
+CREATE TABLE PropertyImages (
+    imageID INT AUTO_INCREMENT PRIMARY KEY,
+    propertyID INT NOT NULL,
+    imagePath VARCHAR(500) NOT NULL,
+    isPrimary BOOLEAN DEFAULT FALSE,
+    displayOrder INT DEFAULT 0,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (propertyID) REFERENCES Properties(propertyID) ON DELETE CASCADE
+);
+
 -- Indexes for performance
 CREATE INDEX idx_users_username ON Users(username);
 CREATE INDEX idx_users_email ON Users(email);
@@ -58,3 +77,7 @@ CREATE INDEX idx_bookings_property ON Bookings(propertyID);
 CREATE INDEX idx_bookings_renter ON Bookings(renterID);
 CREATE INDEX idx_reviews_property ON Reviews(propertyID);
 CREATE INDEX idx_reviews_renter ON Reviews(renterID);
+CREATE INDEX idx_sessions_token ON Sessions(sessionToken);
+CREATE INDEX idx_sessions_user ON Sessions(userID);
+CREATE INDEX idx_property_images_property ON PropertyImages(propertyID);
+CREATE INDEX idx_property_images_primary ON PropertyImages(propertyID, isPrimary);

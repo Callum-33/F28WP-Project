@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import AuthModal from './AuthModal';
 import './Navigate.css';
 
 const Navigate = () => {
   const location = useLocation();
+  const { user, logout } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const navItems = [
     { name: 'Rent', path: '/rent' },
     { name: 'Sell', path: '/sell' },
@@ -54,6 +58,10 @@ const Navigate = () => {
     setActiveIndex(index);
   };
 
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-container">
@@ -71,7 +79,25 @@ const Navigate = () => {
           ))}
           <div className="slider" style={sliderStyle} />
         </div>
+        <div className="nav-auth">
+          {user ? (
+            <div className="user-info">
+              <span className="username">Welcome, {user.username}!</span>
+              <button onClick={handleLogout} className="auth-button logout-button">
+                Logout
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowAuthModal(true)} className="auth-button login-button">
+              Login
+            </button>
+          )}
+        </div>
       </div>
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </nav>
   );
 };
