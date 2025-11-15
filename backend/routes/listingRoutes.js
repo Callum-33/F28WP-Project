@@ -1,9 +1,7 @@
-
 const router = require('express').Router();
 const pool = require('../utils/dbConnection');
 const { authenticateToken } = require('../middleware/authMiddleware');
 
-// Create listing (protected)
 router.post('/listings', authenticateToken, async (req, res) => {
     const { listerId, title, description, price, location } = req.body;
 
@@ -12,40 +10,24 @@ router.post('/listings', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Convert location object to address string if needed
         let address = '';
         if (location && typeof location === 'object') {
-            address = [location.street, location.city, location.country]
-                .filter(Boolean)
-                .join(', ');
+            address = [location.street, location.city, location.country].filter(Boolean).join(', ');
         } else if (typeof location === 'string') {
             address = location;
         }
 
-        const query = `
-            INSERT INTO Properties (ownerID, propertyName, pDescription, pAddress, pricePerNight, rooms)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `;
+        const [result] = await pool.query(
+            'INSERT INTO Properties (ownerID, propertyName, pDescription, pAddress, pricePerNight, rooms) VALUES (?, ?, ?, ?, ?, ?)',
+            [listerId, title, description || '', address, parseFloat(price), 1]
+        );
         
-        const values = [
-            listerId,
-            title,
-            description || '',
-            address,
-            parseFloat(price),
-            1 // Default to 1 room, you may want to make this a required field
-        ];
-
-        const [result] = await pool.query(query, values);
-        
-        // Get the newly created listing
         const [newListingRows] = await pool.query(
             'SELECT propertyID, ownerID, propertyName, pDescription, pAddress, pricePerNight, rooms FROM Properties WHERE propertyID = ?',
             [result.insertId]
         );
         const newListing = newListingRows[0];
 
-        // Transform the response to match the expected format
         const responseData = {
             id: newListing.propertyID,
             listerId: newListing.ownerID,
@@ -67,7 +49,6 @@ router.post('/listings', authenticateToken, async (req, res) => {
     }
 });
 
-// Get and filter listings
 router.get('/listings', async (req, res) => {
     try {
         let query = `
@@ -111,7 +92,6 @@ router.get('/listings', async (req, res) => {
 
         const [result] = await pool.query(query, values);
         
-        // Transform the results to match the expected format
         const listings = result.map(row => ({
             propertyID: row.propertyID,
             ownerID: row.ownerID,
@@ -133,13 +113,11 @@ router.get('/listings', async (req, res) => {
     }
 });
 
-// Update listing (protected)
 router.put('/listings/:id', authenticateToken, async (req, res) => {
     const listingId = parseInt(req.params.id);
     const updateData = req.body;
 
     try {
-        // Check if listing exists
         const [existing] = await pool.query('SELECT propertyID FROM Properties WHERE propertyID = ?', [listingId]);
         
         if (existing.length === 0) {
@@ -171,11 +149,8 @@ router.put('/listings/:id', authenticateToken, async (req, res) => {
         }
 
         values.push(listingId);
-        const updateQuery = `UPDATE Properties SET ${updateFields.join(', ')} WHERE propertyID = ?`;
-        
-        await pool.query(updateQuery, values);
+        await pool.query(`UPDATE Properties SET ${updateFields.join(', ')} WHERE propertyID = ?`, values);
 
-        // Get the updated listing
         const [updatedRows] = await pool.query('SELECT * FROM Properties WHERE propertyID = ?', [listingId]);
         
         res.status(200).json({
@@ -188,7 +163,6 @@ router.put('/listings/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Delete listing (protected)
 router.delete('/listings/:id', authenticateToken, async (req, res) => {
     const listingId = parseInt(req.params.id);
 
@@ -206,16 +180,11 @@ router.delete('/listings/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Lister Routes - Get bookings for a property (protected)
 router.get('/listings/:id/bookings', authenticateToken, async (req, res) => {
     const listingId = parseInt(req.params.id);
 
     try {
-        const [bookings] = await pool.query(
-            'SELECT * FROM Bookings WHERE propertyID = ?',
-            [listingId]
-        );
-
+        const [bookings] = await pool.query('SELECT * FROM Bookings WHERE propertyID = ?', [listingId]);
         res.status(200).json(bookings);
     } catch (error) {
         console.error('Error fetching bookings:', error);
@@ -223,13 +192,12 @@ router.get('/listings/:id/bookings', authenticateToken, async (req, res) => {
     }
 });
 
-// Approve / deny booking (protected)
 router.put('/listings/:id/status', authenticateToken, async (req, res) => {
     const bookingId = parseInt(req.params.id);
     const newStatus = req.body.status;
 
     if (!['approved', 'denied'].includes(newStatus)) {
-        return res.status(400).json({message: 'Invalid status value. Must be "approved" or "denied".' });
+        return res.status(400).json({ message: 'Invalid status value. Must be "approved" or "denied".' });
     }
 
     try {
@@ -243,10 +211,7 @@ router.put('/listings/:id/status', authenticateToken, async (req, res) => {
 
         if (bookingToUpdate.bookingStatus === 'Pending') {
             const capitalizedStatus = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
-            await pool.query(
-                'UPDATE Bookings SET bookingStatus = ? WHERE bookingID = ?',
-                [capitalizedStatus, bookingId]
-            );
+            await pool.query('UPDATE Bookings SET bookingStatus = ? WHERE bookingID = ?', [capitalizedStatus, bookingId]);
 
             const [updated] = await pool.query('SELECT * FROM Bookings WHERE bookingID = ?', [bookingId]);
 
@@ -265,22 +230,16 @@ router.put('/listings/:id/status', authenticateToken, async (req, res) => {
     }
 });
 
-// View lister's listings (protected)
 router.get('/users/:listerId/listings', authenticateToken, async (req, res) => {
     const listerId = parseInt(req.params.listerId);
 
     try {
-        const [listings] = await pool.query(
-            'SELECT * FROM Properties WHERE ownerID = ?',
-            [listerId]
-        );
-
+        const [listings] = await pool.query('SELECT * FROM Properties WHERE ownerID = ?', [listerId]);
         res.status(200).json(listings);
     } catch (error) {
         console.error('Error fetching user listings:', error);
         res.status(500).json({ error: 'Internal server error while fetching user listings' });
     }
 });
-
 
 module.exports = router;

@@ -89,16 +89,13 @@ const ListingDetailPanel = ({ listing, onClose }) => {
 
         <div className="panel-map">
           <div className="map-placeholder">
-            {/* <p>Map placeholder - {pAddress}</p> */}
             <iframe
               width="100%"
               height="100%"
-              // style="border:0"
               loading="lazy"
-              allowfullscreen
-              referrerpolicy="no-referrer-when-downgrade"
-              src={`https://www.google.com/maps/embed/v1/place?key=KEY_HERE
-    &q=${encodeURIComponent(pAddress)}`}>
+              allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_MAPS_API_KEY}&q=${encodeURIComponent(pAddress)}`}>
             </iframe>
           </div>
         </div>

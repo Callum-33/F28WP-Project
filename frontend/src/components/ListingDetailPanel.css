@@ -6,11 +6,9 @@
   height: calc(100% - 1rem);
   background: white;
   overflow-y: auto;
-  overflow-x: hidden;
   flex-shrink: 0;
   margin-bottom: 1rem;
   border-radius: 1rem;
-  box-sizing: border-box;
 }
 
 .close-button {
@@ -58,10 +56,6 @@
   padding: 20px;
 }
 
-.panel-header {
-  margin-bottom: 20px;
-}
-
 .property-badge {
   display: inline-block;
   background: #f0f0f0;
@@ -70,7 +64,6 @@
   font-size: 12px;
   font-weight: 500;
   margin-bottom: 10px;
-  text-transform: capitalize;
 }
 
 .panel-title {
@@ -154,10 +147,6 @@
   background: #365abc;
 }
 
-.panel-map {
-  margin-top: 20px;
-}
-
 .map-placeholder {
   width: 100%;
   height: 250px;
@@ -166,7 +155,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #666;
 }
 
 @media (max-width: 768px) {

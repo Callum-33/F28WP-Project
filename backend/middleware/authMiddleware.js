@@ -10,7 +10,6 @@ async function authenticateToken(req, res, next) {
     const token = authHeader.substring(7);
 
     try {
-        // Check if session exists and is valid
         const [sessionRows] = await pool.query(
             `SELECT s.userID, s.expiry, u.username, u.role, u.email, u.fName, u.lName 
              FROM Sessions s 
@@ -25,7 +24,6 @@ async function authenticateToken(req, res, next) {
 
         const session = sessionRows[0];
 
-        // Attach user info to request
         req.user = {
             id: session.userID,
             username: session.username,

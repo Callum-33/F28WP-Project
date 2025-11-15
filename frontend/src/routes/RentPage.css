@@ -9,23 +9,13 @@
 
 .listings-container {
   flex: 1;
-  /* transition: all 0.3s ease; */
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 1rem;
   height: 100%;
 }
 
-.listings-container.with-panel {
-  flex: 1;
-}
-
-/* Mobile: Panel takes full width */
 @media (max-width: 768px) {
-  .rent-page-container {
-    flex-direction: column;
-  }
-
   .listings-container.with-panel {
     display: none;
   }
