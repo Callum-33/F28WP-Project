@@ -23,6 +23,13 @@ yarn-error.log*
 *.db
 *.sqlite
 
+# Uploaded files (user-generated content)
+backend/uploads/properties/*
+!backend/uploads/properties/.gitkeep
+
+# Docker volumes (database data)
+mysql_data/
+
 # IDE
 .vscode/
 .idea/

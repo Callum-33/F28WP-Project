@@ -10,8 +10,6 @@ const RentPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedListing, setSelectedListing] = useState(null);
-  const [maxPrice, setMaxPrice] = useState(Infinity);
-  const [minPrice, setMinPrice] = useState(0);
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -40,17 +38,15 @@ const RentPage = () => {
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error}</p>;
 
-
   return (
     <div className="rent-page-container">
       <div className={`listings-container ${selectedListing ? 'with-panel' : ''}`}>
         <ListingGrid>
-          {listings.map((listing, index) => {
+          {listings.map((listing) => {
             const isActive = selectedListing && listing.propertyID === selectedListing.propertyID;
-            if (listing.pricePerNight <= maxPrice && listing.pricePerNight >= minPrice)
             return (
               <Card 
-                key={listing.propertyID || index} 
+                key={listing.propertyID} 
                 listing={listing} 
                 onClick={() => handleListingClick(listing)}
                 active={isActive}

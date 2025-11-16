@@ -1,20 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import AuthModal from './AuthModal';
+import Modal from './Modal';
+import AccountManagement from './AccountManagement';
 import './Navigate.css';
 
 const Navigate = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const navItems = [
     { name: 'Rent', path: '/rent' },
     { name: 'Sell', path: '/sell' },
-    { name: 'Favourites', path: '/favourites' }
+    { name: 'My Rentals', path: '/my-rentals' }
   ];
   const [activeIndex, setActiveIndex] = useState(0);
   const [sliderStyle, setSliderStyle] = useState({});
   const navRefs = useRef([]);
 
   useEffect(() => {
-    // Update slider position when active index changes
     if (navRefs.current[activeIndex]) {
       const activeElement = navRefs.current[activeIndex];
       setSliderStyle({
@@ -25,7 +31,6 @@ const Navigate = () => {
   }, [activeIndex]);
 
   useEffect(() => {
-    // Update active index based on current route
     const index = navItems.findIndex(
       item => location.pathname === item.path || location.pathname.startsWith(item.path)
     );
@@ -35,7 +40,6 @@ const Navigate = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    // Handle window resize
     const handleResize = () => {
       if (navRefs.current[activeIndex]) {
         const activeElement = navRefs.current[activeIndex];
@@ -71,7 +75,31 @@ const Navigate = () => {
           ))}
           <div className="slider" style={sliderStyle} />
         </div>
+        <div className="nav-auth">
+          {user ? (
+            <div className="user-info">
+              <span className="username">Welcome, {user.username}!</span>
+              <button onClick={() => setShowAccountModal(true)} className="auth-button logout-button">
+                Account
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowAuthModal(true)} className="auth-button login-button">
+              Login
+            </button>
+          )}
+        </div>
       </div>
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
+      <Modal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+      >
+        <AccountManagement onClose={() => setShowAccountModal(false)} />
+      </Modal>
     </nav>
   );
 };
