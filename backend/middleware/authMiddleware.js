@@ -3,11 +3,15 @@ const pool = require('../utils/dbConnection');
 async function authenticateToken(req, res, next) {
     const authHeader = req.headers.authorization;
     
+    console.log('Auth middleware - Headers:', req.headers.authorization ? 'Present' : 'Missing');
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        console.log('Auth failed: Invalid or missing Authorization header');
         return res.status(401).json({ message: 'Authentication required' });
     }
 
     const token = authHeader.substring(7);
+    console.log('Token received (first 10 chars):', token.substring(0, 10));
 
     try {
         const [sessionRows] = await pool.query(
@@ -19,10 +23,12 @@ async function authenticateToken(req, res, next) {
         );
 
         if (sessionRows.length === 0) {
+            console.log('Auth failed: Session not found or expired');
             return res.status(401).json({ message: 'Invalid or expired session' });
         }
 
         const session = sessionRows[0];
+        console.log('Auth successful for user:', session.username);
 
         req.user = {
             id: session.userID,
