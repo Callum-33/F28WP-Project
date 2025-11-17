@@ -1,6 +1,6 @@
 const mysql = require('mysql2/promise');
 
-const pool = mysql.createPool({
+const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'rentals_user',
@@ -11,15 +11,13 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-// Test the connection
-pool.getConnection()
-    .then(connection => {
-        console.log('Connected to MySQL database');
-        connection.release();
-    })
-    .catch(err => {
-        console.error('Error connecting to MySQL database:', err);
-        process.exit(-1);
-    });
+pool.on('connect', () => {
+    console.log('Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+    process.exit(-1);
+});
 
 module.exports = pool;

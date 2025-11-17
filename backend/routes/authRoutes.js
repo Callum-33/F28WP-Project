@@ -1,22 +1,26 @@
 const router = require('express').Router();
 const pool = require('../utils/dbConnection');
-const { hashPassword, verifyPassword, generateSessionToken } = require('../utils/cryptoUtils');
-const { authenticateToken } = require('../middleware/authMiddleware');
+const { hashPassword } = require('../utils/cryptoUtils');
 
+
+// Register a new user
 router.post('/users/register', async (req, res) => {
     const { username, password, role, email, firstName, lastName } = req.body;
 
+    // Validate required fields
     if (!username || !password) {
         return res.status(400).json({ message: 'Missing required fields: username, password' });
     }
 
+    
     try {
         const [existingUserResult] = await pool.query('SELECT userID FROM Users WHERE username = ?', [username]);
         
-        if (existingUserResult.length > 0) {
+        if (existingUserResult.rows.length > 0) {
             return res.status(409).json({ message: 'Username already exists' });
         }
 
+        // Hash the password before storing
         const { hash, salt } = hashPassword(password);
 
         const [result] = await pool.query(
@@ -30,6 +34,7 @@ router.post('/users/register', async (req, res) => {
         );
         const newUser = newUserRows[0];
 
+        // Respond with the newly created user details
         res.status(201).json({ 
             message: 'User registered successfully', 
             userId: newUser.userID,
@@ -48,14 +53,14 @@ router.post('/users/register', async (req, res) => {
     }
 });
 
-router.put('/users/:id', authenticateToken, async (req, res) => {
+router.put('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
     const { username, password, role, email, firstName, lastName } = req.body;
 
     try {
         const [userResult] = await pool.query('SELECT * FROM Users WHERE userID = ?', [userId]);
         
-        if (userResult.length === 0) {
+        if (userResult.rows.length === 0) {
             return res.status(404).json({ message: 'User not found' });
         }
 
@@ -67,32 +72,38 @@ router.put('/users/:id', authenticateToken, async (req, res) => {
             values.push(username);
         }
         
+        // Hash the password before updating
         if (password !== undefined) {
             const { hash, salt } = hashPassword(password);
             updateFields.push('passwordHash = ?', 'salt = ?');
             values.push(hash, salt);
         }
         
+        // Validate role value
         if (role !== undefined) {
             updateFields.push('role = ?');
             values.push(role);
         }
         
+        // Validate email format
         if (email !== undefined) {
             updateFields.push('email = ?');
             values.push(email);
         }
         
+        // Validate first name
         if (firstName !== undefined) {
             updateFields.push('fName = ?');
             values.push(firstName);
         }
         
+        // Validate last name
         if (lastName !== undefined) {
             updateFields.push('lName = ?');
             values.push(lastName);
         }
 
+        // Check that there is at least one field to update
         if (updateFields.length === 0) {
             return res.status(400).json({ message: 'No fields to update' });
         }
@@ -106,6 +117,7 @@ router.put('/users/:id', authenticateToken, async (req, res) => {
         );
         const updatedUser = updatedUserRows[0];
 
+        // Respond with the updated user details
         res.status(200).json({
             message: 'User updated successfully',
             user: {
@@ -123,7 +135,7 @@ router.put('/users/:id', authenticateToken, async (req, res) => {
     }
 });
 
-router.delete('/users/:id', authenticateToken, async (req, res) => {
+router.delete('/users/:id', async (req, res) => {
     const userId = parseInt(req.params.id);
 
     try {
@@ -133,7 +145,31 @@ router.delete('/users/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        await pool.query('DELETE FROM Users WHERE userID = ?', [userId]);
+        // Delete related data first (to maintain referential integrity)
+        // Delete reviews by this user
+        await pool.query('DELETE FROM Reviews WHERE renterID = $1', [userId]);
+        
+        // Delete bookings by this user
+        await pool.query('DELETE FROM Bookings WHERE renterID = $1', [userId]);
+        
+        // Delete properties owned by this user (and their associated bookings/reviews)
+        await pool.query(`
+            DELETE FROM Reviews WHERE propertyID IN 
+            (SELECT propertyID FROM Properties WHERE ownerID = $1)
+        `, [userId]);
+        
+        await pool.query(`
+            DELETE FROM Bookings WHERE propertyID IN 
+            (SELECT propertyID FROM Properties WHERE ownerID = $1)
+        `, [userId]);
+        
+        await pool.query('DELETE FROM Properties WHERE ownerID = $1', [userId]);
+        
+        // Finally, delete the user
+        await pool.query('DELETE FROM Users WHERE userID = $1', [userId]);
+
+        // Commit the transaction
+        await pool.query('COMMIT');
 
         res.status(200).json({ message: 'User and associated data deleted successfully' });
     } catch (error) {
